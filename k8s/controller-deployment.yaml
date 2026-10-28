@@ -59,6 +59,8 @@ spec:
               value: "5.0"
             - name: STATUS_SERVER_PORT
               value: "8080"
+            - name: AUDIT_LOG_FILE
+              value: "/tmp/audit_events.jsonl"
           resources:
             requests:
               cpu: "100m"
@@ -70,7 +72,7 @@ spec:
             httpGet:
               path: /healthz
               port: 8080
-            initialDelaySeconds: 5
+            initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3

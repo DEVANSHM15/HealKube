@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY healkube/ /app/healkube/
 
 # Run as non-root user for security best practices
-RUN useradd -u 10001 -m healkube
+RUN useradd -u 10001 -m healkube && chown -R healkube:healkube /app
 USER healkube
 
 EXPOSE 8080
