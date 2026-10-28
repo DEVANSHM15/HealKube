@@ -1,0 +1,64 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Demo App - HTTP Request Rate",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(healkube_demo_requests_total[1m])) by (status)",
+          "legendFormat": "Status {{status}}"
+        }
+      ]
+    },
+    {
+      "title": "Demo App - 5xx Error Rate (%)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(healkube_demo_errors_total[1m])) / sum(rate(healkube_demo_requests_total[1m]))",
+          "legendFormat": "Error Rate %"
+        }
+      ]
+    },
+    {
+      "title": "Demo App - P95 Latency (s)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(healkube_demo_request_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "P95 Latency (s)"
+        }
+      ]
+    },
+    {
+      "title": "Deployment Replicas",
+      "type": "stat",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "kube_deployment_status_replicas_available{deployment='demo-app'}",
+          "legendFormat": "Available Replicas"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "title": "HealKube Workload Health & Telemetry",
+  "uid": "healkube-dashboard",
+  "version": 1
+}

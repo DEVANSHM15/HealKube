@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healkube-controller
+  namespace: healkube-demo
+  labels:
+    app.kubernetes.io/name: healkube-controller
+    app.kubernetes.io/part-of: healkube
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healkube-controller
+  template:
+    metadata:
+      labels:
+        app: healkube-controller
+    spec:
+      serviceAccountName: healkube-controller-sa
+      containers:
+        - name: controller
+          image: healkube-controller:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: status-http
+          env:
+            - name: KUBERNETES_MODE
+              value: "in_cluster"
+            - name: TARGET_NAMESPACE
+              value: "healkube-demo"
+            - name: TARGET_DEPLOYMENT
+              value: "demo-app"
+            - name: NAMESPACE_ALLOWLIST
+              value: '["healkube-demo"]'
+            - name: WORKLOAD_ALLOWLIST
+              value: '["demo-app"]'
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.healkube-demo.svc.cluster.local:9090"
+            - name: DEPENDENCY_HEALTH_URL
+              value: "http://demo-app.healkube-demo.svc.cluster.local/dependency-health"
+            - name: DRY_RUN
+              value: "true"
+            - name: POLL_INTERVAL_SECONDS
+              value: "5.0"
+            - name: CONSECUTIVE_BREACHES_REQUIRED
+              value: "3"
+            - name: ERROR_RATE_THRESHOLD_PERCENT
+              value: "5.0"
+            - name: LATENCY_P95_THRESHOLD_SECONDS
+              value: "1.0"
+            - name: COOLDOWN_PERIOD_SECONDS
+              value: "60.0"
+            - name: VERIFICATION_WAIT_SECONDS
+              value: "10.0"
+            - name: VERIFICATION_CHECKS_REQUIRED
+              value: "3"
+            - name: VERIFICATION_INTERVAL_SECONDS
+              value: "5.0"
+            - name: STATUS_SERVER_PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
