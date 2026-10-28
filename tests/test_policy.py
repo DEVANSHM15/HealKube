@@ -8,6 +8,7 @@ from healkube.controller.models import (
     DiagnosisResult,
     DiagnosisType,
     RemediationActionType,
+    RemediationDecision,
 )
 
 
@@ -136,3 +137,49 @@ def test_policy_scaling_avoids_fighting_hpa(mock_config, resource_pressure_snaps
 
     assert decision.action == RemediationActionType.NO_ACTION
     assert "hpa is already configured" in decision.reason.lower()
+
+
+def test_allowlist_string_and_json_normalization():
+    from healkube.controller.config import ControllerConfig
+
+    # Comma-separated string
+    cfg_comma = ControllerConfig(
+        namespace_allowlist="ns-a, ns-b, ns-c",
+        workload_allowlist="app-1, app-2",
+    )
+    assert cfg_comma.namespace_allowlist == ["ns-a", "ns-b", "ns-c"]
+    assert cfg_comma.workload_allowlist == ["app-1", "app-2"]
+
+    # JSON formatted string
+    cfg_json = ControllerConfig(
+        namespace_allowlist='["ns-1", "ns-2"]',
+        workload_allowlist='["web"]',
+    )
+    assert cfg_json.namespace_allowlist == ["ns-1", "ns-2"]
+    assert cfg_json.workload_allowlist == ["web"]
+
+
+def test_remediation_executor_dry_run_default_override():
+    from unittest.mock import MagicMock
+    from healkube.controller.remediation import RemediationExecutor
+
+    mock_core = MagicMock()
+    # Executor configured with dry_run_default=True
+    executor = RemediationExecutor(core_api=mock_core, dry_run_default=True)
+
+    # Decision mistakenly marked dry_run=False
+    decision = RemediationDecision(
+        action=RemediationActionType.RESTART_POD,
+        target_namespace="test-ns",
+        target_workload="test-app",
+        target_pod="pod-1",
+        reason="Forced live restart",
+        dry_run=False,  # Mistakenly set to False!
+        timestamp=time.time(),
+    )
+
+    success, err = executor.execute(decision)
+    assert success is True
+    assert err is None
+    # Must NOT call delete_namespaced_pod due to executor-level safety latch
+    mock_core.delete_namespaced_pod.assert_not_called()

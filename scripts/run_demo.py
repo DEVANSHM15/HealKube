@@ -99,7 +99,14 @@ class SimulatedClusterState:
 
 
 def run_demo():
-    print_banner("HEALKUBE: AUTONOMOUS APPLICATION-AWARE SELF-HEALING CONTROLLER")
+    print_banner(
+        "HEALKUBE: AUTONOMOUS APPLICATION-AWARE SELF-HEALING CONTROLLER\n"
+        "  MODE: LOCAL SIMULATION (In-Memory K8s Mock - No Live Cluster Required)"
+    )
+    print("  [ENVIRONMENT NOTICE]")
+    print("  Operating mode: 'local_mock' (in-memory simulated Kubernetes state).")
+    print("  No live Kubernetes cluster connection is required for this demonstration.")
+    print("  Target workload, Prometheus metrics, and Pod recreation are simulated in-memory.\n")
 
     config = ControllerConfig(
         kubernetes_mode="local_mock",

@@ -264,10 +264,17 @@ def run_single_experiment(system: str, scenario: str, timeout_seconds: float = 3
 
 
 def run_all_experiments():
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 85)
     print("  HEALKUBE EXPERIMENTAL EVALUATION SUITE")
+    print("  Mode: In-Memory Analytical Simulation (Traffic Model + Live Controller Timing)")
     print("  Comparing Native Kubernetes vs. Kubernetes + HealKube")
-    print("=" * 80 + "\n")
+    print("=" * 85)
+    print("  [METHODOLOGY & REPRODUCIBILITY DISCLOSURE]")
+    print("  - Controller Overhead: Measured live via time.perf_counter() during real code execution.")
+    print("  - Detection & Recovery: Executed directly via HealKube Detector, Policy, and Verifier.")
+    print("  - Workload & Traffic: Analytical simulation (25 RPS request stream under fixed fault rate).")
+    print("  - Native K8s Baseline: Standard kubelet probe model (period: 5s, threshold: 3 = 15s detection).")
+    print("=" * 85 + "\n")
 
     scenarios = ["pod_failure", "application_degradation", "dependency_failure"]
     results = []

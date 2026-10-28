@@ -2,8 +2,8 @@
 Configuration management for HealKube controller using Pydantic Settings.
 """
 
-from typing import List, Literal, Optional
-from pydantic import Field
+from typing import List, Literal, Optional, Union
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,14 +35,28 @@ class ControllerConfig(BaseSettings):
         default="demo-app",
         description="Target deployment name to monitor and manage",
     )
-    namespace_allowlist: List[str] = Field(
+    namespace_allowlist: Union[List[str], str] = Field(
         default=["healkube-demo"],
         description="Allowed namespaces for any remediation mutation",
     )
-    workload_allowlist: List[str] = Field(
+    workload_allowlist: Union[List[str], str] = Field(
         default=["demo-app"],
         description="Allowed deployment/workload names for any remediation mutation",
     )
+
+    @field_validator("namespace_allowlist", "workload_allowlist", mode="after")
+    @classmethod
+    def normalize_allowlists(cls, v):
+        if isinstance(v, str):
+            import json
+            trimmed = v.strip()
+            if trimmed.startswith("[") and trimmed.endswith("]"):
+                try:
+                    return json.loads(trimmed)
+                except Exception:
+                    pass
+            return [item.strip() for item in trimmed.split(",") if item.strip()]
+        return v
 
     # Prometheus Monitoring
     prometheus_url: str = Field(

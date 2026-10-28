@@ -59,6 +59,7 @@ class HealKubeController:
         self.remediation_executor = remediation_executor or RemediationExecutor(
             core_api=self.monitor.core_api,
             apps_api=self.monitor.apps_api,
+            dry_run_default=self.config.dry_run,
         )
         self.verifier = verifier or RecoveryVerifier(self.config)
         self.audit_logger = audit_logger or AuditLogger(self.config.audit_log_file)

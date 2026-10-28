@@ -98,7 +98,7 @@ class PrometheusClient:
         PromQL: 100 * (sum(rate(healkube_demo_errors_total[2m])) / sum(rate(healkube_demo_requests_total[2m])))
         """
         promql = (
-            f"100 * (sum(rate(healkube_demo_errors_total[2m])) or 0) / "
+            f"100 * (sum(rate(healkube_demo_errors_total[2m])) or on() vector(0)) / "
             f"(sum(rate(healkube_demo_requests_total[2m])) > 0)"
         )
         metric = self.query(promql)

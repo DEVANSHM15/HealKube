@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 class RemediationExecutor:
     """Executes remediation decisions on the Kubernetes cluster."""
 
-    def __init__(self, core_api=None, apps_api=None):
+    def __init__(self, core_api=None, apps_api=None, dry_run_default: Optional[bool] = None):
         self.core_api = core_api
         self.apps_api = apps_api
+        self.dry_run_default = dry_run_default
 
     def execute(self, decision: RemediationDecision) -> Tuple[bool, Optional[str]]:
         """
@@ -37,8 +38,13 @@ class RemediationExecutor:
             logger.warning("Remediation Notice [%s]: %s", decision.action.value, decision.reason)
             return True, None
 
-        # Check Dry Run
-        if decision.dry_run:
+        # Check Dry Run (Defense-in-depth: decision dry_run or executor default)
+        is_dry_run = (
+            decision.dry_run
+            if self.dry_run_default is None
+            else (self.dry_run_default or decision.dry_run)
+        )
+        if is_dry_run:
             logger.info(
                 "[DRY RUN] Would execute %s for %s/%s. Reason: %s",
                 decision.action.value,
