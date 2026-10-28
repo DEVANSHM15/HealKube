@@ -199,8 +199,8 @@ async def lifespan(app: FastAPI):
     global controller_instance
     if controller_instance is None:
         controller_instance = HealKubeController()
-        loop_thread = threading.Thread(target=controller_instance.run_loop, daemon=True)
-        loop_thread.start()
+    loop_thread = threading.Thread(target=controller_instance.run_loop, daemon=True)
+    loop_thread.start()
     yield
     # Shutdown
     if controller_instance:
