@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: healkube-controller
+  namespace: healkube-demo
+  labels:
+    app.kubernetes.io/name: healkube-controller
+    app.kubernetes.io/part-of: healkube
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http-dashboard
+  selector:
+    app: healkube-controller
+

@@ -17,9 +17,9 @@ def main():
     )
     parser.add_argument(
         "--type",
-        choices=["500", "latency", "dependency", "reset", "status"],
+        choices=["500", "latency", "dependency", "surge", "reset", "status"],
         required=True,
-        help="Fault type: 500 (HTTP errors), latency (delay), dependency (upstream outage), reset, status",
+        help="Fault type: 500, latency, dependency, surge (high CPU + latency), reset, status",
     )
     parser.add_argument(
         "--rate",
@@ -30,8 +30,14 @@ def main():
     parser.add_argument(
         "--delay",
         type=float,
-        default=2.0,
-        help="Extra latency in seconds (for type=latency)",
+        default=2.5,
+        help="Extra latency in seconds (for type=latency or type=surge)",
+    )
+    parser.add_argument(
+        "--cpu",
+        type=float,
+        default=95.0,
+        help="CPU utilization percentage (for type=surge)",
     )
     parser.add_argument(
         "--duration",
@@ -58,6 +64,7 @@ def main():
             "error_rate": 0.0,
             "extra_latency_seconds": 0.0,
             "simulate_dependency_down": False,
+            "cpu_utilization_percent": 0.0,
             "duration_seconds": args.duration,
         }
 
@@ -66,7 +73,11 @@ def main():
             print(f"Injecting {args.rate * 100:.0f}% HTTP 500 errors...")
         elif args.type == "latency":
             payload["extra_latency_seconds"] = args.delay
-            print(f"Injecting {args.delay:.2f}s latency...")
+            print(f"Injecting {args.delay:.2f}s latency (Low CPU -> Triggers RESTART_POD)...")
+        elif args.type == "surge":
+            payload["extra_latency_seconds"] = args.delay
+            payload["cpu_utilization_percent"] = args.cpu
+            print(f"Injecting Traffic Surge (Latency: {args.delay:.2f}s, CPU: {args.cpu:.1f}%) -> Triggers SCALE_UP...")
         elif args.type == "dependency":
             payload["simulate_dependency_down"] = True
             print("Simulating upstream dependency outage...")

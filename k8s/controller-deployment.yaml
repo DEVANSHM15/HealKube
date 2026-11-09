@@ -37,26 +37,28 @@ spec:
               value: '["demo-app"]'
             - name: PROMETHEUS_URL
               value: "http://prometheus.healkube-demo.svc.cluster.local:9090"
+            - name: APP_BASE_URL
+              value: "http://demo-app.healkube-demo.svc.cluster.local"
             - name: DEPENDENCY_HEALTH_URL
               value: "http://demo-app.healkube-demo.svc.cluster.local/dependency-health"
             - name: DRY_RUN
               value: "true"
             - name: POLL_INTERVAL_SECONDS
-              value: "5.0"
+              value: "3.0"
             - name: CONSECUTIVE_BREACHES_REQUIRED
-              value: "3"
+              value: "2"
             - name: ERROR_RATE_THRESHOLD_PERCENT
               value: "5.0"
             - name: LATENCY_P95_THRESHOLD_SECONDS
               value: "1.0"
             - name: COOLDOWN_PERIOD_SECONDS
-              value: "60.0"
+              value: "15.0"
             - name: VERIFICATION_WAIT_SECONDS
-              value: "10.0"
+              value: "3.0"
             - name: VERIFICATION_CHECKS_REQUIRED
-              value: "3"
+              value: "2"
             - name: VERIFICATION_INTERVAL_SECONDS
-              value: "5.0"
+              value: "2.0"
             - name: STATUS_SERVER_PORT
               value: "8080"
             - name: AUDIT_LOG_FILE

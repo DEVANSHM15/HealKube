@@ -298,9 +298,142 @@ prometheus-6d75bc5959-p9m87            1/1     Running   0          40s
 ### Step 6: Inspect Controller Status API
 Port-forward the controller status port:
 ```bash
-kubectl port-forward -n healkube-demo deployment/healkube-controller 8080:8080
+kubectl port-forward -n healkube-demo deployment/healkube-controller 8888:8080
 ```
-Visit `http://localhost:8080/status` or `http://localhost:8080/healthz` to inspect real-time controller state, last snapshot, active diagnosis, and recent audit records.
+Visit `http://localhost:8888` to access the full **Mission Control Web Dashboard** (or `http://localhost:8888/status` for JSON API).
+
+---
+
+## 🎬 Live Demonstration & Professor Defense Guide (Frontend & Backend)
+
+Use this step-by-step runbook during live presentations. Run your PowerShell terminal side-by-side with your browser window at `http://localhost:8888`.
+
+### Step 0: Pre-Flight Environment Setup
+
+```powershell
+# 1. Start Minikube (if not already running)
+minikube start
+
+# 2. Port-forward the controller Mission Control Dashboard
+kubectl port-forward -n healkube-demo service/healkube-controller 8888:8080
+```
+1. Open your browser at **`http://localhost:8888`**.
+2. In the top bar, toggle the mode button to **`MODE: LIVE REMEDIATION`** (Green badge).
+3. In the bottom-left Chaos Deck, click **"Reset All Faults"** to ensure clean nominal state.
+4. If replicas were previously scaled up, reset them to 1 baseline replica:
+   ```powershell
+   kubectl scale deployment/demo-app -n healkube-demo --replicas=1
+   ```
+
+---
+
+### Scenario 1: Silent Application Degradation & Autonomous Recovery
+
+Demonstrates the **Kubernetes Telemetry Gap** where native K8s `/health` stays `200 OK` while real traffic fails.
+
+#### 1. Frontend Action:
+1. In the Chaos Deck (bottom-left), click **"Inject 2.5s Latency Spike"** (or "Inject 80% HTTP 500 Errors").
+2. Click the blue button **"Test Endpoint Now"** under the top card 2–3 times.
+
+#### 2. What to Point Out in the UI:
+- **Top Card (The Gap)**: `Kubelet Probe (/health)` stays green **`200 OK (Alive)`** (Native K8s takes NO action). Meanwhile, `Real Traffic (/api/data)` shows high latency (~2500ms).
+- **State Machine**: Evaluates 3 consecutive breaches to prevent false alarms, transitions to `3. DIAGNOSE (APPLICATION_DEGRADATION)`.
+- **Remediation**: Executes `RESTART_POD` (Action 5).
+- **Telemetry Graph**: The yellow P95 latency line crashes off a cliff back down to zero.
+
+#### 3. Backend Verification Commands (Show the Professor):
+```powershell
+# A. Prove the live microservice in Minikube is actually delayed:
+Invoke-RestMethod -Uri "http://127.0.0.1:8888/api/test-request"
+
+# B. View real-time controller decision logs:
+kubectl logs -n healkube-demo deployment/healkube-controller --tail 20  
+
+# C. Prove Kubernetes replaced the Pod (check the 'AGE' column - it will be seconds old):
+kubectl get pods -n healkube-demo -l app=demo-app
+
+# D. View the official Kubernetes eviction & container recreation events:
+kubectl get events -n healkube-demo --sort-by=.metadata.creationTimestamp
+```
+
+---
+
+### Scenario 2: Upstream Dependency Outage (Intelligent Non-Restart)
+
+Demonstrates HealKube's **rule precedence** and safety: refusing to restart application pods when the root cause is external.
+
+#### 1. Frontend Action:
+1. In the Chaos Deck, click **"Simulate Upstream Database Outage"**.
+
+#### 2. What to Point Out in the UI:
+- **Upstream Dependency Gauge**: Switches to **`OFFLINE (Unhealthy)`**.
+- **Diagnosis**: Diagnoses **`DEPENDENCY_FAILURE`**.
+- **Decision**: Decides **`REPORT_DEPENDENCY_ISSUE`**.
+- **Explanation to Professor**: *"Restarting an application pod cannot fix a downed database. HealKube deliberately refuses to restart pods to prevent CrashLoopBackOff and cascading thundering-herd outages on recovery."*
+
+#### 3. Backend Verification Commands:
+```powershell
+# A. Verify upstream health failure reported in the telemetry snapshot:
+(Invoke-RestMethod -Uri "http://127.0.0.1:8888/status").last_diagnosis
+
+# B. Verify the pod restart count did NOT increment (pods were preserved):
+kubectl get pods -n healkube-demo -l app=demo-app
+
+# C. Verify controller logs explicit refusal to restart:
+kubectl logs -n healkube-demo deployment/healkube-controller --tail 15
+```
+
+#### 4. Restore:
+Click **"Reset All Faults"** in the Chaos Deck. The upstream gauge immediately returns to `ONLINE`.
+
+---
+
+### Scenario 3: Traffic Surge (Horizontal Scaling vs. Pod Restart)
+
+Demonstrates HealKube distinguishing between internal code lockups vs. legitimate traffic saturation.
+
+#### 1. Frontend Action:
+1. In the Chaos Deck, click **"Simulate Traffic Surge (95% CPU + 2.5s Latency)"**.
+2. Click **"Test Endpoint Now"** 2 times.
+
+#### 2. What to Point Out in the UI:
+- **Telemetry Gauges**: CPU utilization reaches **95%** (Warning) alongside elevated latency.
+- **Diagnosis**: Diagnoses **`RESOURCE_PRESSURE`** (instead of `APPLICATION_DEGRADATION`).
+- **Remediation**: Decides **`SCALE_UP`** (+1 Replica) rather than killing the pod.
+- **Explanation to Professor**: *"Because CPU is >= 85%, the application is handling legitimate heavy user load. Restarting the pod would kill active customer connections. Scaling out horizontally absorbs the traffic surge."*
+
+#### 3. Backend Verification Commands:
+```powershell
+# A. Check deployment replicas scaled from 1 -> 2:
+kubectl get deployment demo-app -n healkube-demo
+
+# B. View both active running Pod instances scheduled by Kubernetes:
+kubectl get pods -n healkube-demo -l app=demo-app
+```
+
+#### 4. Restore:
+Click **"Reset All Faults"** in the Chaos Deck, and scale back down:
+```powershell
+kubectl scale deployment/demo-app -n healkube-demo --replicas=1
+```
+
+---
+
+### Scenario 4: The Append-Only Audit Trail Verification
+
+Demonstrates auditability, explainability, and cryptographically structured operational history.
+
+#### 1. Frontend Action:
+Scroll to the **Append-Only Audit Trail** table at the bottom of the dashboard. Point out the Event IDs (`evt-xxxx`), timestamps, and `SUCCESS` outcomes.
+
+#### 2. Backend Verification Command:
+```powershell
+# Read the raw JSONL audit trail directly from inside the controller pod:
+kubectl exec -n healkube-demo deployment/healkube-controller -- tail -n 2 /tmp/audit_events.jsonl
+```
+👉 **Verification Proof**: The exact same `event_id`, confidence score (e.g. `0.90`), diagnosis evidence, and verification records exist byte-for-byte on the container disk.
+
+---
 
 ---
 

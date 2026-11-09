@@ -26,6 +26,22 @@ def test_normal_data_request():
     demo_module.ENABLE_FAULT_INJECTION = True
     client.post("/fault/reset")
 
+
+def test_cpu_utilization_fault_injection():
+    demo_module.ENABLE_FAULT_INJECTION = True
+    client.post("/fault/reset")
+
+    # Inject 95% CPU
+    resp = client.post("/fault/inject", json={"cpu_utilization_percent": 95.0})
+    assert resp.status_code == 200
+
+    metrics_resp = client.get("/metrics")
+    assert "healkube_demo_cpu_utilization_percent 95.0" in metrics_resp.text
+
+    client.post("/fault/reset")
+    metrics_reset = client.get("/metrics")
+    assert "healkube_demo_cpu_utilization_percent 0.0" in metrics_reset.text
+
     response = client.get("/api/data")
     assert response.status_code == 200
     assert response.json()["status"] == "success"
@@ -85,3 +101,19 @@ def test_dependency_health_and_simulation():
     assert resp_down.json()["status"] == "unhealthy"
 
     client.post("/fault/reset")
+
+
+def test_cpu_utilization_fault_injection():
+    demo_module.ENABLE_FAULT_INJECTION = True
+    client.post("/fault/reset")
+
+    # Inject 95% CPU
+    resp = client.post("/fault/inject", json={"cpu_utilization_percent": 95.0})
+    assert resp.status_code == 200
+
+    metrics_resp = client.get("/metrics")
+    assert "healkube_demo_cpu_utilization_percent 95.0" in metrics_resp.text
+
+    client.post("/fault/reset")
+    metrics_reset = client.get("/metrics")
+    assert "healkube_demo_cpu_utilization_percent 0.0" in metrics_reset.text

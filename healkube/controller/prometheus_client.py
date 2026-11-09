@@ -71,7 +71,10 @@ class PrometheusClient:
                     error_message="Missing value in metric result",
                 )
 
+            import math
             val_float = float(first_val_str)
+            if math.isnan(val_float) or math.isinf(val_float):
+                val_float = 0.0
             return MetricValue(
                 value=val_float,
                 status=MetricStatus.AVAILABLE,
@@ -94,12 +97,12 @@ class PrometheusClient:
 
     def get_error_rate_percent(self, namespace: str, workload: str) -> MetricValue:
         """
-        Calculates 5xx error rate as a percentage of total requests over the last 2m.
-        PromQL: 100 * (sum(rate(healkube_demo_errors_total[2m])) / sum(rate(healkube_demo_requests_total[2m])))
+        Calculates 5xx error rate as a percentage of total requests over the last 30s.
+        PromQL: 100 * (sum(rate(healkube_demo_errors_total[30s])) / sum(rate(healkube_demo_requests_total[30s])))
         """
         promql = (
-            f"100 * (sum(rate(healkube_demo_errors_total[2m])) or on() vector(0)) / "
-            f"(sum(rate(healkube_demo_requests_total[2m])) > 0)"
+            f"(100 * (sum(rate(healkube_demo_errors_total[30s])) or on() vector(0)) / "
+            f"(sum(rate(healkube_demo_requests_total[30s])) > 0)) or on() vector(0)"
         )
         metric = self.query(promql)
         metric.unit = "%"
@@ -107,11 +110,11 @@ class PrometheusClient:
 
     def get_latency_p95_seconds(self, namespace: str, workload: str) -> MetricValue:
         """
-        Calculates P95 latency in seconds over the last 2m.
+        Calculates P95 latency in seconds over the last 30s.
         """
         promql = (
             "histogram_quantile(0.95, "
-            "sum(rate(healkube_demo_request_duration_seconds_bucket[2m])) by (le))"
+            "sum(rate(healkube_demo_request_duration_seconds_bucket[30s])) by (le))"
         )
         metric = self.query(promql)
         metric.unit = "s"
@@ -120,12 +123,14 @@ class PrometheusClient:
     def get_cpu_utilization_percent(self, namespace: str, workload: str) -> MetricValue:
         """
         Calculates container CPU utilization percentage if container metrics are present.
+        Falls back to application-level CPU gauge if cAdvisor is not running in demo cluster.
         """
         promql = (
-            f"100 * sum(rate(container_cpu_usage_seconds_total{{namespace='{namespace}',"
-            f"pod=~'{workload}-.*',container!='POD',container!=''}}[2m])) / "
+            f"((100 * sum(rate(container_cpu_usage_seconds_total{{namespace='{namespace}',"
+            f"pod=~'{workload}-.*',container!='POD',container!=''}}[30s])) / "
             f"sum(kube_pod_container_resource_limits{{namespace='{namespace}',"
-            f"pod=~'{workload}-.*',resource='cpu'}})"
+            f"pod=~'{workload}-.*',resource='cpu'}})) "
+            f"or on() (healkube_demo_cpu_utilization_percent))"
         )
         metric = self.query(promql)
         metric.unit = "%"

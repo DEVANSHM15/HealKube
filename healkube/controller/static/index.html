@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HealKube Mission Control — Kubernetes Autonomous Controller</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
+          },
+          colors: {
+            charcoal: {
+              950: '#090a0f',
+              900: '#0f1117',
+              850: '#141721',
+              800: '#1a1e2b',
+              700: '#262b3d',
+              600: '#343b52',
+            },
+            k8s: {
+              green: '#10b981',
+              greenDark: '#064e3b',
+              greenLight: '#34d399',
+              amber: '#f59e0b',
+              red: '#ef4444',
+              blue: '#3b82f6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      background-color: #090a0f;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+    }
+    .panel {
+      background-color: #12151e;
+      border: 1px solid #1f2536;
+      border-radius: 8px;
+    }
+    .panel-sub {
+      background-color: #181c28;
+      border: 1px solid #23293d;
+      border-radius: 6px;
+    }
+    /* Subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090a0f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #262b3d;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #343b52;
+    }
+  </style>
+</head>
+<body class="bg-charcoal-950 text-slate-200 min-h-screen text-[13px] antialiased selection:bg-emerald-600 selection:text-white">
+
+  <!-- TOP WRAPPER -->
+  <div class="max-w-[1440px] mx-auto p-4 sm:p-6 space-y-5">
+
+    <!-- 1. TOP NAV / SHELL BAR -->
+    <header class="panel px-4 py-3 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm font-semibold text-white tracking-tight">HealKube Mission Control</h1>
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              RECONCILER ACTIVE
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Application-Aware Autonomous Kubernetes Self-Healing Controller</p>
+        </div>
+      </div>
+
+      <!-- Controls & Metadata -->
+      <div class="flex items-center flex-wrap gap-2.5 text-xs font-mono">
+        <div class="px-3 py-1.5 panel-sub text-slate-400">
+          NAMESPACE: <span id="targetWorkloadText" class="text-slate-200 font-semibold">healkube-demo / demo-app</span>
+        </div>
+        <div class="px-3 py-1.5 panel-sub text-slate-400">
+          CYCLE: <span id="iterationCount" class="text-emerald-400 font-semibold">#0</span>
+        </div>
+        <!-- Mode Toggle -->
+        <button id="modeToggleBtn" onclick="toggleMode()" class="px-3.5 py-1.5 rounded font-semibold border transition-all flex items-center gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20">
+          <i data-lucide="toggle-right" class="w-4 h-4"></i>
+          <span id="modeText">MODE: LIVE REMEDIATION</span>
+          <span id="headerModeArg" class="hidden">--mode=LIVE_REMEDIATION</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. THE KUBERNETES TELEMETRY GAP (CORE COMPARISON) -->
+    <div class="panel p-5">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-charcoal-700">
+        <div>
+          <h2 class="text-sm font-semibold text-white">Native Kubelet Liveness vs. Actual User Traffic Health</h2>
+          <p class="text-xs text-slate-400 mt-0.5">The Kubernetes Telemetry Gap: Demonstrating silent application degradation that native probes miss.</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-charcoal-800 text-slate-400 border border-charcoal-700">
+          ARCHITECTURAL GAP
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Native Kubelet Probe -->
+        <div class="panel-sub p-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-medium text-slate-300 flex items-center gap-1.5 text-xs">
+                <i data-lucide="box" class="w-4 h-4 text-slate-400"></i> Kubelet Probe (<span class="font-mono text-slate-400">/health</span>)
+              </span>
+              <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-charcoal-900 text-slate-400 border border-charcoal-700">K8s Native</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Standard Kubelet process check. Continues returning 200 OK as long as the web process has not crashed, even during internal thread starvation.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-charcoal-700 flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              STATUS: 200 OK (Alive)
+            </span>
+            <span class="text-xs text-slate-400">Native K8s takes NO action</span>
+          </div>
+        </div>
+
+        <!-- Real User Ingress -->
+        <div class="panel-sub p-4 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-medium text-white flex items-center gap-1.5 text-xs">
+                <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i> Real User Traffic (<span class="font-mono text-emerald-400">/api/data</span>)
+              </span>
+              <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">HealKube APM</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Actual application business transaction. Measures true user wait time and unhandled thread stalls from client-facing requests.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-charcoal-700 flex items-center justify-between gap-3">
+            <div id="testEndpointBadge">
+              <span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                STATUS: 200 OK (29.6ms)
+              </span>
+            </div>
+            <button onclick="testAppEndpoint()" class="px-3.5 py-1.5 rounded text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-white transition-colors flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i> Test Endpoint Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. VITALS & TELEMETRY GAUGES (CLEAN CHARCOAL PANELS WITH EMERALD ACCENTS) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+      <!-- Gauge 1: 5xx Error Rate -->
+      <div id="cardErrorRate" class="panel p-4 flex flex-col justify-between transition-colors">
+        <div>
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <span class="font-medium">HTTP 5XX ERROR RATE</span>
+            <span class="font-mono text-slate-500">LIM: 5.0%</span>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span id="metricErrorRate" class="text-3xl font-bold font-mono text-white">0.0%</span>
+            <span id="metricErrorBadge" class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Nominal</span>
+          </div>
+        </div>
+        <div class="mt-4 pt-2 border-t border-charcoal-700">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>METER</span>
+            <span id="errorAsciiBar" class="text-emerald-400">[░░░░░░░░░░░░░░░░]</span>
+          </div>
+          <div id="errorProgressBar" class="hidden"></div>
+        </div>
+      </div>
+
+      <!-- Gauge 2: P95 Request Latency -->
+      <div id="cardLatency" class="panel p-4 flex flex-col justify-between transition-colors">
+        <div>
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <span class="font-medium">P95 REQUEST LATENCY</span>
+            <span class="font-mono text-slate-500">LIM: 1.00s</span>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span id="metricLatency" class="text-3xl font-bold font-mono text-white">0.03s</span>
+            <span id="metricLatencyBadge" class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Nominal</span>
+          </div>
+        </div>
+        <div class="mt-4 pt-2 border-t border-charcoal-700">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+            <span>METER</span>
+            <span id="latencyAsciiBar" class="text-emerald-400">[█░░░░░░░░░░░░░░░]</span>
+          </div>
+          <div id="latencyProgressBar" class="hidden"></div>
+        </div>
+      </div>
+
+      <!-- Gauge 3: Upstream Dependency -->
+      <div id="cardDependency" class="panel p-4 flex flex-col justify-between transition-colors">
+        <div>
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <span class="font-medium">UPSTREAM DEPENDENCY</span>
+            <span class="font-mono text-slate-500">DB / CACHE</span>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span id="metricDependency" class="text-3xl font-bold font-mono text-white">ONLINE</span>
+            <span id="dependencyDot" class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Stable</span>
+          </div>
+        </div>
+        <div class="mt-4 pt-2 border-t border-charcoal-700 text-xs text-slate-400 font-mono truncate" id="metricDependencySub">
+          &bull; /dependency-health: nominal
+        </div>
+      </div>
+
+      <!-- Gauge 4: Pod State & CPU -->
+      <div id="cardPod" class="panel p-4 flex flex-col justify-between transition-colors">
+        <div>
+          <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+            <span class="font-medium">POD LIFECYCLE & CPU</span>
+            <span id="podNodeText" class="font-mono text-slate-500">minikube</span>
+          </div>
+          <div class="flex items-baseline justify-between">
+            <span id="podRestartsText" class="text-2xl font-bold font-mono text-white truncate">0 restarts</span>
+            <span id="podStatusBadge" class="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">[1/1 READY]</span>
+          </div>
+        </div>
+        <div class="mt-4 pt-2 border-t border-charcoal-700 text-xs text-slate-400 font-mono truncate" id="podNameText">
+          demo-app-647cdf9ccc-...
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 4. RECONCILIATION STATE MACHINE -->
+    <div class="panel p-5">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-charcoal-700">
+        <div>
+          <h2 class="text-sm font-semibold text-white">Autonomous Self-Healing Lifecycle</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Deterministic 6-stage closed-loop reconciliation state machine.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400 font-mono">DIAGNOSIS:</span>
+          <span id="activeDiagnosisBadge" class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            HEALTHY
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-6 gap-3 text-center text-xs">
+        <div id="stepObserve" class="panel-sub p-3 transition-all">
+          <div class="text-[11px] font-mono font-semibold text-slate-500">01. OBSERVE</div>
+          <div class="font-medium text-white mt-1">Telemetry Pull</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Prometheus + K8s</div>
+        </div>
+
+        <div id="stepDetect" class="panel-sub p-3 transition-all">
+          <div class="text-[11px] font-mono font-semibold text-slate-500">02. DETECT</div>
+          <div class="font-medium text-white mt-1">Breaches: <span id="breachCountText" class="font-mono text-emerald-400 font-semibold">0/3</span></div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Anti-Flapping</div>
+        </div>
+
+        <div id="stepDiagnose" class="panel-sub p-3 transition-all">
+          <div class="text-[11px] font-mono font-semibold text-slate-500">03. DIAGNOSE</div>
+          <div class="font-medium text-white mt-1">Classification</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Precedence Tree</div>
+        </div>
+
+        <div id="stepPolicy" class="panel-sub p-3 transition-all">
+          <div class="text-[11px] font-mono font-semibold text-slate-500">04. POLICY</div>
+          <div class="font-medium text-white mt-1">Safety Guard</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Cooldown / HPA</div>
+        </div>
+
+        <div id="stepRemediate" class="panel-sub p-3 transition-all">
+          <div class="text-[11px] font-mono font-semibold text-slate-500">05. REMEDIATE</div>
+          <div class="font-medium text-white mt-1">Mutation</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Restart / Scale</div>
+        </div>
+
+        <div id="stepVerify" class="panel-sub p-3 transition-all">
+          <div class="text-[11px] font-mono font-semibold text-slate-500">06. VERIFY</div>
+          <div class="font-medium text-white mt-1">Multi-Check</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Stabilization</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. CHAOS DECK & TELEMETRY STREAM (SPLIT ROW) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <!-- Left: Chaos Control Deck (5 cols) -->
+      <div class="lg:col-span-5 panel p-5 space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-charcoal-700">
+          <div>
+            <h2 class="text-sm font-semibold text-white">Interactive Chaos Deck</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Inject controlled faults into target pod for live evaluation.</p>
+          </div>
+          <span class="text-xs font-mono text-slate-500">TEST HARNESS</span>
+        </div>
+
+        <!-- 500 Error Button -->
+        <button onclick="injectChaos('500')" class="w-full text-left p-3 panel-sub hover:border-slate-500 transition-all group">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs font-medium text-slate-200 group-hover:text-emerald-300">
+              $ ./inject_fault.sh --type=500_ERR --rate=0.80
+            </span>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500 group-hover:text-emerald-400"></i>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Simulates internal deadlock. Kubelet /health stays 200 OK.</p>
+        </button>
+
+        <!-- Latency Spike Button -->
+        <button onclick="injectChaos('latency')" class="w-full text-left p-3 panel-sub hover:border-slate-500 transition-all group">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs font-medium text-slate-200 group-hover:text-emerald-300">
+              $ ./inject_fault.sh --type=LATENCY --delay=2.5s
+            </span>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500 group-hover:text-emerald-400"></i>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Degrades P95 latency without 500 errors. Triggers RESTART_POD.</p>
+        </button>
+
+        <!-- Database Outage Button -->
+        <button onclick="injectChaos('dependency')" class="w-full text-left p-3 panel-sub hover:border-slate-500 transition-all group">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs font-medium text-slate-200 group-hover:text-emerald-300">
+              $ ./simulate_outage.sh --target=upstream_db
+            </span>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500 group-hover:text-emerald-400"></i>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Rule 1 Precedence: HealKube REFUSES to restart application pods.</p>
+        </button>
+
+        <!-- Traffic Surge Button -->
+        <button onclick="injectChaos('surge')" class="w-full text-left p-3 panel-sub hover:border-slate-500 transition-all group">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-xs font-medium text-slate-200 group-hover:text-emerald-300">
+              $ ./surge_traffic.sh --cpu=95% --latency=2.5s
+            </span>
+            <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500 group-hover:text-emerald-400"></i>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Resource saturation: CPU &ge; 85% triggers SCALE_UP (+1 replica).</p>
+        </button>
+
+        <!-- Reset Button -->
+        <button onclick="resetChaos()" class="w-full p-2.5 rounded font-semibold text-xs border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset All Faults (Restore Clean Nominal State)</span>
+        </button>
+
+        <div id="chaosNotification" class="hidden p-2.5 rounded text-xs font-mono bg-charcoal-800 border border-emerald-500/30 text-emerald-300"></div>
+      </div>
+
+      <!-- Right: Real-Time Telemetry Stream & Benchmarks (7 cols) -->
+      <div class="lg:col-span-7 space-y-5">
+
+        <!-- Telemetry Chart -->
+        <div class="panel p-5">
+          <div class="flex items-center justify-between pb-2 border-b border-charcoal-700 mb-3">
+            <div>
+              <h2 class="text-sm font-semibold text-white">Prometheus Real-Time Telemetry Stream</h2>
+              <p class="text-xs text-slate-400 mt-0.5">P95 request latency (s) alongside HTTP 5xx error rate (%).</p>
+            </div>
+            <span class="text-xs font-mono text-slate-500">1.5s JITTER</span>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="realtimeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Benchmark Table -->
+        <div class="panel p-5">
+          <div class="flex items-center justify-between pb-2 border-b border-charcoal-700 mb-3">
+            <div>
+              <h2 class="text-sm font-semibold text-white">Scientific Benchmark Comparison</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Empirical failure response: Native K8s vs. HealKube.</p>
+            </div>
+            <span class="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              -93.3% FAILED REQS
+            </span>
+          </div>
+
+          <div class="overflow-x-auto text-xs">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-charcoal-700 text-slate-400 text-[11px] font-mono">
+                  <th class="py-2 px-2.5">SCENARIO</th>
+                  <th class="py-2 px-2.5">SYSTEM</th>
+                  <th class="py-2 px-2.5">DETECTION</th>
+                  <th class="py-2 px-2.5">TTR</th>
+                  <th class="py-2 px-2.5">FAILED</th>
+                  <th class="py-2 px-2.5">SUCCESS</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-charcoal-700 font-mono">
+                <tr>
+                  <td class="py-2 px-2.5 text-slate-200">App Degradation</td>
+                  <td class="py-2 px-2.5 text-red-400 font-semibold">Native K8s</td>
+                  <td class="py-2 px-2.5 text-slate-400">Never (Blind)</td>
+                  <td class="py-2 px-2.5 text-slate-400">&gt;30s Timeout</td>
+                  <td class="py-2 px-2.5 text-red-400 font-semibold">450</td>
+                  <td class="py-2 px-2.5 text-red-400">0.0%</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-2.5 text-slate-200">App Degradation</td>
+                  <td class="py-2 px-2.5 text-emerald-400 font-semibold">K8s + HealKube</td>
+                  <td class="py-2 px-2.5 text-emerald-400">2.0s (3-chk)</td>
+                  <td class="py-2 px-2.5 text-emerald-400">2.0s</td>
+                  <td class="py-2 px-2.5 text-emerald-400 font-semibold">30 (-93%)</td>
+                  <td class="py-2 px-2.5 text-emerald-400 font-semibold">100.0%</td>
+                </tr>
+                <tr>
+                  <td class="py-2 px-2.5 text-slate-200">Dependency Failure</td>
+                  <td class="py-2 px-2.5 text-emerald-400 font-semibold">K8s + HealKube</td>
+                  <td class="py-2 px-2.5 text-emerald-400">2.0s</td>
+                  <td class="py-2 px-2.5 text-slate-400">Avoided Restart</td>
+                  <td class="py-2 px-2.5 text-amber-400">44</td>
+                  <td class="py-2 px-2.5 text-emerald-400 font-semibold">100.0%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 6. APPEND-ONLY AUDIT TRAIL -->
+    <div class="panel p-5">
+      <div class="flex items-center justify-between pb-2 border-b border-charcoal-700 mb-3">
+        <div>
+          <h2 class="text-sm font-semibold text-white">Append-Only Audit Trail (<span class="font-mono text-slate-400">/tmp/audit_events.jsonl</span>)</h2>
+          <p class="text-xs text-slate-400 mt-0.5">Immutable audit log recording root causes, decisions, and verification proofs.</p>
+        </div>
+        <span id="auditEventCount" class="text-xs font-mono text-slate-500">0 events logged</span>
+      </div>
+
+      <div class="overflow-x-auto text-xs">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-charcoal-700 text-slate-400 text-[11px] font-mono">
+              <th class="py-2 px-2.5">TIMESTAMP</th>
+              <th class="py-2 px-2.5">EVENT_ID</th>
+              <th class="py-2 px-2.5">DIAGNOSIS</th>
+              <th class="py-2 px-2.5">DECISION_ACTION</th>
+              <th class="py-2 px-2.5">EXECUTION</th>
+              <th class="py-2 px-2.5">VERIFICATION</th>
+              <th class="py-2 px-2.5 text-right">EVIDENCE</th>
+            </tr>
+          </thead>
+          <tbody id="auditTableBody" class="divide-y divide-charcoal-700 font-mono">
+            <tr>
+              <td colspan="7" class="py-4 px-2.5 text-center text-slate-500">
+                -- No audit events logged in current session --
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="text-center text-xs text-slate-500 py-3 border-t border-charcoal-700">
+      HealKube Controller &bull; Apache 2.0 License &bull; Application-Aware Autonomous Kubernetes Self-Healing
+    </footer>
+
+  </div>
+
+  <!-- EVIDENCE MODAL (JSON VIEWER) -->
+  <div id="evidenceModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="panel w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="p-3.5 border-b border-charcoal-700 flex items-center justify-between bg-charcoal-850">
+        <span class="text-sm font-semibold text-white font-mono">Audit Event Payload (/tmp/audit_events.jsonl)</span>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white px-2 py-1 rounded text-xs bg-charcoal-800 hover:bg-charcoal-700 font-mono">[ESC / CLOSE]</button>
+      </div>
+      <div class="p-4 overflow-auto flex-1 text-xs text-emerald-400 bg-charcoal-950 font-mono">
+        <pre id="modalJsonContent" class="whitespace-pre-wrap"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLIENT-SIDE LOGIC -->
+  <script>
+    lucide.createIcons();
+
+    // Chart.js Setup: High-Visibility Dual-Axis Telemetry Chart
+    const ctx = document.getElementById('realtimeChart').getContext('2d');
+    const MAX_POINTS = 25;
+    const chartLabels = Array(MAX_POINTS).fill('');
+    const errorData = Array(MAX_POINTS).fill(0);
+    const latencyData = Array(MAX_POINTS).fill(0);
+
+    const telemetryChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: 'P95 Latency (s)',
+            data: latencyData,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            borderWidth: 2.5,
+            tension: 0.25,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#10b981',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
+            fill: true,
+            yAxisID: 'y',
+          },
+          {
+            label: '5xx Error Rate (%)',
+            data: errorData,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#ef4444',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
+            fill: false,
+            yAxisID: 'y1',
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              boxWidth: 12,
+              usePointStyle: true,
+              pointStyle: 'circle',
+              font: { family: 'Inter', size: 11, weight: 'bold' },
+              color: '#cbd5e1',
+            }
+          },
+          tooltip: {
+            backgroundColor: '#181c28',
+            borderColor: '#262b3d',
+            borderWidth: 1,
+            titleFont: { family: 'Inter', size: 12 },
+            bodyFont: { family: 'JetBrains Mono', size: 11 },
+          }
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: { display: false },
+            ticks: {
+              color: '#64748b',
+              font: { family: 'JetBrains Mono', size: 9 },
+              maxTicksLimit: 5,
+            }
+          },
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Latency (s)',
+              color: '#10b981',
+              font: { family: 'Inter', size: 11, weight: '600' }
+            },
+            min: 0,
+            suggestedMax: 3.0,
+            grid: { color: 'rgba(38, 43, 61, 0.5)' },
+            ticks: {
+              color: '#10b981',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: (val) => val.toFixed(1) + 's'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: '5xx Error (%)',
+              color: '#ef4444',
+              font: { family: 'Inter', size: 11, weight: '600' }
+            },
+            min: 0,
+            max: 100,
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: '#ef4444',
+              font: { family: 'JetBrains Mono', size: 10 },
+              callback: (val) => val + '%'
+            }
+          }
+        }
+      }
+    });
+
+    let currentDryRun = true;
+    let auditRecordsCache = [];
+
+    function renderAsciiBar(value, max, length = 16) {
+      const ratio = Math.max(0, Math.min(1, value / max));
+      const filled = Math.round(ratio * length);
+      return '[' + '█'.repeat(filled) + '░'.repeat(length - filled) + ']';
+    }
+
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        updateUI(data);
+      } catch (err) {
+        console.warn('Status poll error:', err);
+      }
+    }
+
+    function updateUI(data) {
+      if (!data) return;
+
+      document.getElementById('iterationCount').innerText = `#${data.iteration_count || 0}`;
+      if (data.config) {
+        document.getElementById('targetWorkloadText').innerText = 
+          `${data.config.target_namespace} / ${data.config.target_deployment}`;
+        
+        currentDryRun = data.config.dry_run;
+        const modeBtn = document.getElementById('modeToggleBtn');
+        const modeText = document.getElementById('modeText');
+        const headerModeArg = document.getElementById('headerModeArg');
+
+        if (currentDryRun) {
+          modeBtn.className = "px-3.5 py-1.5 rounded font-semibold border transition-all flex items-center gap-2 bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20";
+          modeText.innerText = "MODE: DRY-RUN (Safe)";
+          headerModeArg.innerText = "--mode=DRY_RUN";
+        } else {
+          modeBtn.className = "px-3.5 py-1.5 rounded font-semibold border transition-all flex items-center gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20";
+          modeText.innerText = "MODE: LIVE REMEDIATION";
+          headerModeArg.innerText = "--mode=LIVE_REMEDIATION";
+        }
+      }
+
+      let errVal = 0.0;
+      let latVal = 0.0;
+      let depVal = 1.0;
+      let cpuVal = 0.0;
+
+      if (data.last_snapshot && data.last_snapshot.metrics) {
+        const m = data.last_snapshot.metrics;
+        errVal = m.error_rate_percent?.value || 0;
+        latVal = m.latency_p95_seconds?.value || 0;
+        depVal = m.dependency_healthy?.value !== undefined ? m.dependency_healthy.value : 1;
+        cpuVal = m.cpu_utilization_percent?.value || 0;
+      }
+
+      // Card 1: Error Rate
+      const errEl = document.getElementById('metricErrorRate');
+      const errBadge = document.getElementById('metricErrorBadge');
+      const errAscii = document.getElementById('errorAsciiBar');
+      const cardErr = document.getElementById('cardErrorRate');
+      errEl.innerText = `${errVal.toFixed(1)}%`;
+      errAscii.innerText = renderAsciiBar(errVal, 10.0, 16);
+
+      if (errVal >= 5.0) {
+        cardErr.className = "panel p-4 flex flex-col justify-between border-red-500/60 bg-red-950/20";
+        errEl.className = "text-3xl font-bold font-mono text-red-400";
+        errBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-red-500/10 text-red-400 border border-red-500/30";
+        errBadge.innerText = "BREACH";
+        errAscii.className = "text-red-400";
+      } else {
+        cardErr.className = "panel p-4 flex flex-col justify-between";
+        errEl.className = "text-3xl font-bold font-mono text-white";
+        errBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        errBadge.innerText = "Nominal";
+        errAscii.className = "text-emerald-400";
+      }
+
+      // Card 2: Latency
+      const latEl = document.getElementById('metricLatency');
+      const latBadge = document.getElementById('metricLatencyBadge');
+      const latAscii = document.getElementById('latencyAsciiBar');
+      const cardLat = document.getElementById('cardLatency');
+      latEl.innerText = `${latVal.toFixed(2)}s`;
+      latAscii.innerText = renderAsciiBar(latVal, 3.0, 16);
+
+      if (latVal >= 1.0) {
+        cardLat.className = "panel p-4 flex flex-col justify-between border-amber-500/60 bg-amber-950/20";
+        latEl.className = "text-3xl font-bold font-mono text-amber-400";
+        latBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30";
+        latBadge.innerText = "Slow (P95)";
+        latAscii.className = "text-amber-400";
+      } else {
+        cardLat.className = "panel p-4 flex flex-col justify-between";
+        latEl.className = "text-3xl font-bold font-mono text-white";
+        latBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        latBadge.innerText = "Nominal";
+        latAscii.className = "text-emerald-400";
+      }
+
+      // Card 3: Upstream
+      const depEl = document.getElementById('metricDependency');
+      const depDot = document.getElementById('dependencyDot');
+      const depSub = document.getElementById('metricDependencySub');
+      const cardDep = document.getElementById('cardDependency');
+      if (depVal === 0.0) {
+        cardDep.className = "panel p-4 flex flex-col justify-between border-red-500/60 bg-red-950/20";
+        depEl.innerText = "OFFLINE";
+        depEl.className = "text-3xl font-bold font-mono text-red-400";
+        depDot.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-red-500/10 text-red-400 border border-red-500/30";
+        depDot.innerText = "Outage";
+        depSub.innerHTML = `<span class="text-red-400">&bull; HTTP 503 Outage Detected</span>`;
+      } else {
+        cardDep.className = "panel p-4 flex flex-col justify-between";
+        depEl.innerText = "ONLINE";
+        depEl.className = "text-3xl font-bold font-mono text-white";
+        depDot.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        depDot.innerText = "Stable";
+        depSub.innerHTML = `&bull; /dependency-health: nominal`;
+      }
+
+      // Card 4: Pod Info, Restarts & Realtime Lifecycle State
+      if (data.last_snapshot && data.last_snapshot.pods && data.last_snapshot.pods.length > 0) {
+        const pods = data.last_snapshot.pods;
+        const dep = data.last_snapshot.deployment;
+
+        // Detect real-time terminating or provisioning pod during remediation
+        const terminatingPod = pods.find(p => p.deletion_timestamp || p.phase === 'Terminating');
+        const provisioningPod = pods.find(p => !p.is_ready && !p.deletion_timestamp);
+        const activePod = terminatingPod || provisioningPod || pods[0];
+
+        // Total Restarts = Container crashes + Autonomous HealKube pod replacements
+        const autonomousRestarts = (data.recent_audits || []).filter(
+          a => a.decision?.action === 'RESTART_POD' && a.action_executed
+        ).length;
+        const containerRestarts = pods.reduce((acc, p) => acc + (p.restart_count || 0), 0);
+        const totalRestarts = containerRestarts + autonomousRestarts;
+
+        const cpuStr = cpuVal > 0 ? ` | CPU: ${cpuVal.toFixed(0)}%` : '';
+        const healBadge = autonomousRestarts > 0 ? ` (${autonomousRestarts} Healed)` : '';
+        document.getElementById('podRestartsText').innerText = `${totalRestarts} restart${totalRestarts === 1 ? '' : 's'}${healBadge}${cpuStr}`;
+        document.getElementById('podNameText').innerText = activePod.pod_name;
+        document.getElementById('podNodeText').innerText = activePod.node_name || 'minikube';
+
+        const cardPod = document.getElementById('cardPod');
+        const pBadge = document.getElementById('podStatusBadge');
+
+        // Check if remediation verification is actively running
+        const latestAudit = data.recent_audits && data.recent_audits.length > 0 ? data.recent_audits[data.recent_audits.length - 1] : null;
+        const isVerifying = latestAudit && latestAudit.action_executed && (!latestAudit.verification || latestAudit.verification.status === 'VERIFYING...');
+
+        if (terminatingPod) {
+          cardPod.className = "panel p-4 flex flex-col justify-between transition-colors border-amber-500/50 bg-amber-500/10";
+          pBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse";
+          pBadge.innerText = "[TERMINATING POD]";
+        } else if (provisioningPod) {
+          cardPod.className = "panel p-4 flex flex-col justify-between transition-colors border-amber-500/50 bg-amber-500/10";
+          pBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse";
+          pBadge.innerText = `[PROVISIONING: ${provisioningPod.phase.toUpperCase()}]`;
+        } else if (isVerifying && latestAudit.decision?.action === 'RESTART_POD') {
+          cardPod.className = "panel p-4 flex flex-col justify-between transition-colors border-cyan-500/50 bg-cyan-500/10";
+          pBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 animate-pulse";
+          pBadge.innerText = "[REPLACING & VERIFYING]";
+        } else if (cpuVal >= 85) {
+          cardPod.className = "panel p-4 flex flex-col justify-between transition-colors border-blue-500/40 bg-blue-500/5";
+          pBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse";
+          pBadge.innerText = `[CPU: ${cpuVal.toFixed(0)}% SATURATED]`;
+        } else {
+          cardPod.className = "panel p-4 flex flex-col justify-between transition-colors";
+          const allReady = pods.every(p => p.is_ready && p.phase === 'Running');
+          const readyCount = dep ? dep.ready_replicas : pods.filter(p => p.is_ready).length;
+          const desiredCount = dep ? dep.desired_replicas : pods.length;
+          const repText = `[${readyCount}/${desiredCount} READY]`;
+
+          if (allReady) {
+            pBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+            pBadge.innerText = repText;
+          } else {
+            pBadge.className = "px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20";
+            pBadge.innerText = repText;
+          }
+        }
+      }
+
+      // Diagnosis
+      const diag = data.last_diagnosis ? data.last_diagnosis.diagnosis_type : 'HEALTHY';
+      const diagBadge = document.getElementById('activeDiagnosisBadge');
+      diagBadge.innerText = diag;
+
+      if (diag === 'HEALTHY') {
+        diagBadge.className = "px-2.5 py-1 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+      } else if (diag === 'APPLICATION_DEGRADATION') {
+        diagBadge.className = "px-2.5 py-1 rounded text-xs font-mono font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30";
+      } else if (diag === 'RESOURCE_PRESSURE') {
+        diagBadge.className = "px-2.5 py-1 rounded text-xs font-mono font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30";
+      } else {
+        diagBadge.className = "px-2.5 py-1 rounded text-xs font-mono font-semibold bg-red-500/10 text-red-400 border border-red-500/30";
+      }
+
+      // State Machine Pipeline
+      const resetStep = (el) => {
+        el.className = "panel-sub p-3 transition-all";
+        el.firstElementChild.className = "text-[11px] font-mono font-semibold text-slate-500";
+      };
+      const highlightStep = (el) => {
+        el.className = "p-3 rounded-md transition-all bg-emerald-500 text-charcoal-950 font-semibold border border-emerald-400";
+        el.firstElementChild.className = "text-[11px] font-mono font-bold text-charcoal-900";
+      };
+
+      const stepObserve = document.getElementById('stepObserve');
+      const stepDetect = document.getElementById('stepDetect');
+      const stepDiagnose = document.getElementById('stepDiagnose');
+      const stepPolicy = document.getElementById('stepPolicy');
+      const stepRemediate = document.getElementById('stepRemediate');
+      const stepVerify = document.getElementById('stepVerify');
+
+      resetStep(stepObserve);
+      resetStep(stepDetect);
+      resetStep(stepDiagnose);
+      resetStep(stepPolicy);
+      resetStep(stepRemediate);
+      resetStep(stepVerify);
+
+      let breaches = 0;
+      if (data.last_diagnosis && data.last_diagnosis.evidence && data.last_diagnosis.evidence.consecutive_counts) {
+        const counts = Object.values(data.last_diagnosis.evidence.consecutive_counts);
+        breaches = Math.max(0, ...counts);
+      }
+      document.getElementById('breachCountText').innerText = `${breaches}/3`;
+
+      if (data.last_verification && data.last_verification.status) {
+        highlightStep(stepVerify);
+      } else if (data.last_decision && data.last_decision.action !== 'NO_ACTION') {
+        highlightStep(stepRemediate);
+      } else if (diag !== 'HEALTHY') {
+        highlightStep(stepDiagnose);
+      } else if (breaches > 0) {
+        highlightStep(stepDetect);
+      } else {
+        highlightStep(stepObserve);
+      }
+
+      // Chart update: push real telemetry points with timestamp labels
+      const timeLabel = new Date().toLocaleTimeString().split(' ')[0];
+      telemetryChart.data.labels.shift();
+      telemetryChart.data.labels.push(timeLabel);
+
+      // Dataset 0: P95 Latency (s)
+      telemetryChart.data.datasets[0].data.shift();
+      telemetryChart.data.datasets[0].data.push(latVal);
+
+      // Dataset 1: 5xx Error Rate (%)
+      telemetryChart.data.datasets[1].data.shift();
+      telemetryChart.data.datasets[1].data.push(errVal);
+
+      telemetryChart.update();
+
+      // Audit records
+      if (data.recent_audits && Array.isArray(data.recent_audits)) {
+        auditRecordsCache = data.recent_audits;
+        document.getElementById('auditEventCount').innerText = `${data.recent_audits.length} events logged`;
+        renderAuditTable(data.recent_audits);
+      }
+    }
+
+    function renderAuditTable(records) {
+      const tbody = document.getElementById('auditTableBody');
+      if (!records || records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-4 px-2.5 text-center text-slate-500 font-mono">-- No audit events logged in current session --</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = records.slice().reverse().map((r, idx) => {
+        const originalIdx = records.length - 1 - idx;
+        const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '--:--:--';
+        const diag = r.diagnosis?.diagnosis_type || 'UNKNOWN';
+        const action = r.decision?.action || 'NO_ACTION';
+        const isDryRun = r.decision?.dry_run;
+        const executed = r.action_executed;
+
+        let execBadge = isDryRun 
+          ? `<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-amber-500/10 text-amber-400 border border-amber-500/20">DRY-RUN</span>` 
+          : (executed ? `<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">EXECUTED</span>` : `<span class="px-2 py-0.5 rounded text-[11px] font-mono bg-red-500/10 text-red-400 border border-red-500/20">FAILED</span>`);
+
+        let verStatus = r.verification ? r.verification.status : (isDryRun ? 'N/A' : 'VERIFYING...');
+        let verBadge = verStatus === 'SUCCESS' 
+          ? `<span class="text-emerald-400 font-semibold">SUCCESS</span>` 
+          : (verStatus === 'TIMEOUT' ? `<span class="text-red-400 font-semibold">TIMEOUT</span>` 
+          : (verStatus === 'VERIFYING...' ? `<span class="text-amber-400 font-semibold animate-pulse">VERIFYING...</span>` 
+          : `<span class="text-slate-500">${verStatus}</span>`));
+
+        let diagColor = 'text-slate-300';
+        if (diag === 'APPLICATION_DEGRADATION') diagColor = 'text-amber-400 font-semibold';
+        if (diag === 'RESOURCE_PRESSURE') diagColor = 'text-blue-400 font-semibold';
+        if (diag === 'DEPENDENCY_FAILURE') diagColor = 'text-red-400 font-semibold';
+
+        return `
+          <tr class="hover:bg-charcoal-800/50 transition-colors">
+            <td class="py-2 px-2.5 text-slate-400 whitespace-nowrap">${timeStr}</td>
+            <td class="py-2 px-2.5 font-mono text-slate-400">${r.event_id || 'evt-????'}</td>
+            <td class="py-2 px-2.5 ${diagColor}">${diag}</td>
+            <td class="py-2 px-2.5 text-white font-semibold">${action}</td>
+            <td class="py-2 px-2.5">${execBadge}</td>
+            <td class="py-2 px-2.5">${verBadge}</td>
+            <td class="py-2 px-2.5 text-right">
+              <button onclick="viewEvidence(${originalIdx})" class="text-slate-400 hover:text-emerald-400 underline font-mono">
+                [View JSON]
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function toggleMode() {
+      try {
+        const res = await fetch('/api/mode/toggle', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          showNotification(`[MODE] Switched to: ${data.dry_run ? 'DRY_RUN (Safe)' : 'LIVE_REMEDIATION'}`);
+          fetchStatus();
+        }
+      } catch (err) {
+        showNotification('[ERR] Failed to toggle mode');
+      }
+    }
+
+    async function injectChaos(type) {
+      let payload = {
+        error_rate: 0.0,
+        extra_latency_seconds: 0.0,
+        simulate_dependency_down: false,
+        cpu_utilization_percent: 0.0,
+        duration_seconds: 60
+      };
+
+      if (type === '500') payload.error_rate = 0.8;
+      else if (type === 'latency') payload.extra_latency_seconds = 2.5;
+      else if (type === 'dependency') payload.simulate_dependency_down = true;
+      else if (type === 'surge') {
+        payload.cpu_utilization_percent = 95.0;
+        payload.extra_latency_seconds = 2.5;
+      }
+
+      try {
+        const res = await fetch('/api/chaos/inject', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          if (type === 'surge') {
+            showNotification('[CHAOS] Surging traffic: Injected CPU=95% + 2.5s Latency. Generating live requests...');
+          } else if (type === '500') {
+            showNotification('[CHAOS] Injected 80% 500 error rate. Generating live requests...');
+          } else if (type === 'latency') {
+            showNotification('[CHAOS] Injected 2.5s latency. Generating live requests...');
+          } else {
+            showNotification(`[CHAOS] Injected fault: ${type.toUpperCase()}`);
+          }
+          fetchStatus();
+          // Trigger endpoint probe immediately so top status bar reflects the injected fault
+          testAppEndpoint();
+        }
+      } catch (err) {
+        showNotification('[ERR] Chaos injection failed');
+      }
+    }
+
+    async function resetChaos() {
+      try {
+        const res = await fetch('/api/chaos/reset', { method: 'POST' });
+        if (res.ok) {
+          showNotification('[CHAOS] All faults reset to nominal state.');
+          fetchStatus();
+        }
+      } catch (err) {
+        showNotification('[ERR] Fault reset failed');
+      }
+    }
+
+    async function testAppEndpoint() {
+      const badge = document.getElementById('testEndpointBadge');
+      badge.innerHTML = `<span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-charcoal-800 text-slate-400 border border-charcoal-700 animate-pulse">Probing /api/data...</span>`;
+
+      try {
+        const res = await fetch('/api/test-request');
+        const data = await res.json();
+
+        if (data.status_code === 200) {
+          badge.innerHTML = `<span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">STATUS: 200 OK (${data.latency_ms}ms)</span>`;
+        } else {
+          badge.innerHTML = `<span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-red-500/10 text-red-400 border border-red-500/30">STATUS: ${data.status_code} ERROR (${data.latency_ms}ms)</span>`;
+        }
+      } catch (err) {
+        badge.innerHTML = `<span class="px-2.5 py-1 rounded text-xs font-mono font-semibold bg-red-500/10 text-red-400 border border-red-500/30">STATUS: CONNECTION_ERR</span>`;
+      }
+    }
+
+    function showNotification(msg) {
+      const el = document.getElementById('chaosNotification');
+      el.className = 'p-2.5 rounded text-xs font-mono bg-charcoal-800 border border-emerald-500/30 text-emerald-300 block';
+      el.innerText = msg;
+      setTimeout(() => {
+        el.className = 'hidden';
+      }, 4000);
+    }
+
+    function viewEvidence(index) {
+      const record = auditRecordsCache[index];
+      if (!record) return;
+      document.getElementById('modalJsonContent').innerText = JSON.stringify(record, null, 2);
+      document.getElementById('evidenceModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('evidenceModal').classList.add('hidden');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    fetchStatus();
+    setInterval(fetchStatus, 1500);
+  </script>
+</body>
+</html>

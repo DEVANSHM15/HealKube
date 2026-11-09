@@ -9,6 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY experiments_results.csv /app/experiments_results.csv
 COPY healkube/ /app/healkube/
 
 # Run as non-root user for security best practices

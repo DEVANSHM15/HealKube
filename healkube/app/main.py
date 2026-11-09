@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from prometheus_client import (
     Counter,
     Histogram,
+    Gauge,
     generate_latest,
     CONTENT_TYPE_LATEST,
     REGISTRY,
@@ -48,11 +49,17 @@ ERRORS_TOTAL = Counter(
     ["endpoint", "error_code"],
 )
 
+CPU_UTILIZATION_PERCENT = Gauge(
+    "healkube_demo_cpu_utilization_percent",
+    "Current CPU utilization percentage of the demo workload",
+)
+
 # Internal Fault State (Thread-safe dict / primitive access)
 fault_state = {
     "error_rate": 0.0,  # 0.0 to 1.0
     "extra_latency_seconds": 0.0,
     "simulate_dependency_down": False,
+    "cpu_utilization_percent": 0.0,
     "expires_at": 0.0,
 }
 
@@ -63,7 +70,9 @@ def _check_fault_expiration():
         fault_state["error_rate"] = 0.0
         fault_state["extra_latency_seconds"] = 0.0
         fault_state["simulate_dependency_down"] = False
+        fault_state["cpu_utilization_percent"] = 0.0
         fault_state["expires_at"] = 0.0
+        CPU_UTILIZATION_PERCENT.set(0.0)
 
 
 @app.get("/health", summary="Basic Liveness Probe")
@@ -154,6 +163,7 @@ class FaultInjectionRequest(BaseModel):
     error_rate: float = 0.0
     extra_latency_seconds: float = 0.0
     simulate_dependency_down: bool = False
+    cpu_utilization_percent: float = 0.0
     duration_seconds: float = 0.0
 
 
@@ -167,6 +177,8 @@ def inject_fault(req: FaultInjectionRequest):
     fault_state["error_rate"] = max(0.0, min(1.0, req.error_rate))
     fault_state["extra_latency_seconds"] = max(0.0, req.extra_latency_seconds)
     fault_state["simulate_dependency_down"] = req.simulate_dependency_down
+    fault_state["cpu_utilization_percent"] = max(0.0, min(100.0, req.cpu_utilization_percent))
+    CPU_UTILIZATION_PERCENT.set(fault_state["cpu_utilization_percent"])
     if req.duration_seconds > 0:
         fault_state["expires_at"] = time.time() + req.duration_seconds
     else:
@@ -188,7 +200,9 @@ def reset_fault():
     fault_state["error_rate"] = 0.0
     fault_state["extra_latency_seconds"] = 0.0
     fault_state["simulate_dependency_down"] = False
+    fault_state["cpu_utilization_percent"] = 0.0
     fault_state["expires_at"] = 0.0
+    CPU_UTILIZATION_PERCENT.set(0.0)
     return {"message": "All faults cleared", "state": fault_state}
 
 

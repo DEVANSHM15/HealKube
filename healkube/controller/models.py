@@ -2,9 +2,10 @@
 Data models and domain schemas for HealKube.
 """
 
+import math
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MetricStatus(str, Enum):
@@ -19,6 +20,13 @@ class MetricValue(BaseModel):
     status: MetricStatus = MetricStatus.UNKNOWN
     unit: str = ""
     error_message: Optional[str] = None
+
+    @field_validator("value", mode="after")
+    @classmethod
+    def sanitize_float(cls, v):
+        if v is not None and (math.isnan(v) or math.isinf(v)):
+            return 0.0
+        return v
 
 
 class PodHealthState(BaseModel):

@@ -71,17 +71,16 @@ def test_controller_status_api(mock_config, healthy_snapshot):
     # Set as global controller instance for status_app
     main_module.controller_instance = controller
 
-    client = TestClient(status_app)
+    with TestClient(status_app) as client:
+        # Healthz probe
+        health_resp = client.get("/healthz")
+        assert health_resp.status_code == 200
+        assert health_resp.json()["status"] == "ok"
 
-    # Healthz probe
-    health_resp = client.get("/healthz")
-    assert health_resp.status_code == 200
-    assert health_resp.json()["status"] == "ok"
-
-    # Status inspection
-    status_resp = client.get("/status")
-    assert status_resp.status_code == 200
-    data = status_resp.json()
-    assert data["iteration_count"] == 1
-    assert data["last_diagnosis"]["diagnosis_type"] == "HEALTHY"
-    assert data["config"]["target_deployment"] == "test-app"
+        # Status inspection
+        status_resp = client.get("/status")
+        assert status_resp.status_code == 200
+        data = status_resp.json()
+        assert data["iteration_count"] == 1
+        assert data["last_diagnosis"]["diagnosis_type"] == "HEALTHY"
+        assert data["config"]["target_deployment"] == "test-app"

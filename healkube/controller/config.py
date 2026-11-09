@@ -70,13 +70,13 @@ class ControllerConfig(BaseSettings):
 
     # Monitoring & Polling
     poll_interval_seconds: float = Field(
-        default=5.0,
+        default=3.0,
         description="Polling loop sleep interval in seconds",
     )
 
     # Anomaly Detection Thresholds
     consecutive_breaches_required: int = Field(
-        default=3,
+        default=2,
         description="Number of consecutive anomaly observations before triggering remediation",
     )
     error_rate_threshold_percent: float = Field(
@@ -101,6 +101,10 @@ class ControllerConfig(BaseSettings):
         default=True,
         description="Whether dependency health checks are active",
     )
+    app_base_url: str = Field(
+        default="http://localhost:8000",
+        description="Base URL for target demo microservice endpoint (default: http://localhost:8000 or in-cluster http://demo-app.healkube-demo.svc.cluster.local:80)",
+    )
     dependency_health_url: Optional[str] = Field(
         default=None,
         description="HTTP endpoint to verify upstream/downstream dependency health",
@@ -116,7 +120,7 @@ class ControllerConfig(BaseSettings):
         description="Dry run mode: logs and audits actions without executing mutations on K8s",
     )
     cooldown_period_seconds: float = Field(
-        default=60.0,
+        default=15.0,
         description="Minimum seconds required between remediation actions on the same workload",
     )
     allow_pod_restart: bool = Field(
@@ -146,19 +150,19 @@ class ControllerConfig(BaseSettings):
 
     # Recovery Verification
     verification_wait_seconds: float = Field(
-        default=10.0,
+        default=3.0,
         description="Stabilization delay after remediation before verification begins",
     )
     verification_checks_required: int = Field(
-        default=3,
+        default=2,
         description="Number of consecutive healthy checks required to declare recovery",
     )
     verification_interval_seconds: float = Field(
-        default=5.0,
+        default=2.0,
         description="Interval between verification health checks",
     )
     verification_timeout_seconds: float = Field(
-        default=60.0,
+        default=15.0,
         description="Maximum seconds to wait before marking verification timed out",
     )
 

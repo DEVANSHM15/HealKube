@@ -63,6 +63,21 @@ class AuditLogger:
 
         return record
 
+    def update_verification(self, event_id: str, verification: VerificationResult) -> Optional[AuditRecord]:
+        """Updates the verification result on an existing audit record in memory and appends to disk."""
+        for rec in self.memory_history:
+            if rec.event_id == event_id:
+                rec.verification = verification
+                try:
+                    line = rec.model_dump_json()
+                    with open(self.log_filepath, "a", encoding="utf-8") as f:
+                        f.write(line + "\n")
+                    logger.info("Audit record %s updated with verification: %s", event_id, verification.status.value)
+                except Exception as e:
+                    logger.error("Failed to update verification in %s: %s", self.log_filepath, e)
+                return rec
+        return None
+
     def get_recent_records(self, limit: int = 50) -> List[AuditRecord]:
         """Returns the most recent audit records."""
         return self.memory_history[-limit:]
